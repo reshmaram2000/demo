@@ -1,0 +1,746 @@
+ 1. Write a java program to create the table named Department with the attributes Dept_ID, Name, Year_Established, Head_Name, No_of_Employees.
+(i) Find the number employees in a CSE department.
+(ii)List Name, Dept_ID of all the departments which are established in the year 2010.
+
+##Only jdbc- link database and java code
+
+import java.sql.*;
+	public class Department{
+		public static void main(String[] args) {			
+			Connection conn = null;	
+			try{
+				Class.forName("com.mysql.jdbc.Driver");
+				conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/mydb","root","");
+				String query1="select No_of_Employees from Department where Name='CSE'";
+				Statement st=conn.createStatement();
+				ResultSet rs=st.executeQuery(query1);
+				while(rs.next())
+				{
+					int no=rs.getInt("No_of_Employees");
+					System.out.println("No of employees in CSE department = "+no);
+					
+				}
+				
+				Statement st2=conn.createStatement();
+				String query2="select Name,Dept_ID from Department where Year_Established ='2010'";
+				ResultSet rs2=st2.executeQuery(query2);
+				while(rs2.next())
+				{
+					String name=rs2.getString("Name");
+					int did=rs2.getInt("Dept_ID");
+					System.out.println("Name : "+name+"   Department ID: "+did);
+					
+				}
+				st.close();
+				st2.close();
+				conn.close();
+			}
+			catch(Exception e)
+			{
+				System.out.print(e);
+			}}}
+
+2. Write a JAVA-JDBC program that connects to the database College with Student table. Assume appropriate attributes for the Student table. 
+Write a program to display the details of those Students who have CGPA less than 9. Also update the Student table to change the CGPA of student
+named “John” from 8.50 to 9.4 using updatable result set. Finally display the results and disconnect from the database.
+
+##Only jdbc- link database and java program
+
+import java.sql.*;
+public class College{
+	public static void main(String[] args) {
+		Connection conn = null;
+		String f1,f2;
+		float f3;
+		try {
+			Class.forName("com.mysql.jdbc.Driver");
+			conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/College","root","");
+			String query = "Select * FROM Student WHERE CGPA<9.0";
+			System.out.println("Connected to the College database");
+			Statement stmt = conn.createStatement();
+			ResultSet rs = stmt.executeQuery(query);
+			while (rs.next())
+			{
+				f1 = rs.getString(1);
+				f2 = rs.getString(2);
+				f3 = rs.getFloat(3);
+				System.out.println("Name="+f1+"  USN="+f2+"  CGPA="+f3);
+				
+			} //end while
+			System.out.println("Updating table")
+			Statement stmt1 = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE,ResultSet.CONCUR_UPDATABLE);
+			String query1="select Name,CGPA from Student";
+			ResultSet rs1=stmt1.executeQuery(query1);
+			while(rs1.next())
+			{
+				if(rs1.getString("Name").equals("John"))
+				{
+					rs1.updateDouble("CGPA",9.4);
+					rs1.updateRow();
+				}
+				else {
+					break;
+				}
+				
+			}
+			ResultSet rs2=stmt.executeQuery("SELECT * from Student");
+			while (rs2.next())
+			{
+				f1 = rs2.getString(1);
+				f2 = rs2.getString(2);
+				f3 = rs2.getFloat(3);
+				System.out.println("Name="+f1+"  USN="+f2+"  CGPA="+f3);
+				
+			}
+			conn.close();
+			System.out.println("Disconnected from database");
+			} //end try
+
+			catch(ClassNotFoundException e) {
+			e.printStackTrace();
+			}
+			catch(SQLException e) {
+			e.printStackTrace();
+			}
+			catch (Exception e) {
+			e.printStackTrace();
+		}}}
+
+3. Write a Java-JDBC program to implement Banking Application using transaction management. Demonstrate Rollback and Savepoint concept.
+
+##java-jdbc
+
+import java.sql.*;
+import java.util.*;
+
+public class Banking {
+	public static void main(String[] args) {
+		Scanner sc = new Scanner(System.in);
+		PreparedStatement ps;
+		Statement st;
+		ResultSet rs;
+		Connection con;
+		try {
+			con=DriverManager.getConnection("jdbc:mysql://localhost:3306/banking","root","");
+			con.setAutoCommit(false);
+			while(true) {
+				System.out.println("Enter 1.Create Acc, 2.Display Acc details, 3.Transact 4. Exit");
+				int opt  = sc.nextInt();
+				switch(opt) {
+					case 1:
+						System.out.println("Enter id: ");
+						int id = sc.nextInt();
+						System.out.println("Enter Name: ");
+						String name = sc.next();
+						System.out.println("Enter balance: ");
+						int balance = sc.nextInt();
+						String query = "INSERT INTO bank VALUES (?,?,?)";
+						
+						ps = con.prepareStatement(query);
+						ps.setInt(1, id);
+						ps.setString(2, name);
+						ps.setInt(3, balance);
+						ps.execute();
+						con.commit();
+						break;
+					case 2:
+						System.out.println("Enter id: ");
+						id = sc.nextInt();
+						System.out.println("Details: ID, Name, Balance ");
+						st = con.createStatement();
+						rs = st.executeQuery("SELECT * FROM bank where id="+id);
+						while(rs.next()) {
+							System.out.println(rs.getInt(1) + " " + rs.getString(2) + " " + rs.getInt(3));
+						}
+						break;
+					case 3:
+						System.out.println("Transact, please enter your id");
+						id = sc.nextInt();
+						System.out.println("Enter 1.withdraw 2.deposit 3.main menu");
+						int temp = sc.nextInt();
+						switch(temp) {
+							case 1:
+								Savepoint sp1 = con.setSavepoint();
+								System.out.println("Enter amount to withdraw: ");
+								int amt = sc.nextInt();
+								query = "select bal from bank where id = " + id;
+								st = con.createStatement();
+								rs = st.executeQuery(query);
+								int bal = 0;
+								while(rs.next()) {
+									bal = rs.getInt(1);
+								}
+								bal -= amt;
+								System.out.println(bal);
+								query = "update bank set bal = " + bal + " where id = " + id;
+								st.executeUpdate(query);
+								if(bal < 0) {
+									con.rollback(sp1);
+									System.out.println("Rollback! Insufficient balance");
+								}
+								else
+								{
+									System.out.println("Withdraw succ");
+								}
+								con.releaseSavepoint(sp1);
+								con.commit();
+								 break;
+							case 2:
+								System.out.println("Enter amount to deposit: ");
+								amt = sc.nextInt();
+								query = "select bal from bank where id = " + id;
+								st = con.createStatement();
+								rs = st.executeQuery(query);
+								bal = 0;
+								while(rs.next()) {
+									bal = rs.getInt(1);
+								}
+								bal += amt;
+								System.out.println(bal);
+								query = "update bank set bal = " + bal + " where id = " + id;
+								st.executeUpdate(query);
+								System.out.println("Deposit succ");							
+								con.commit();
+								 break;
+						    case 3: break;	 
+						}break;
+						
+					case 4: System.exit(0);
+				}	
+			}	
+			
+		} 
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+
+4.Write a Java servlet program that loads area and phone no. of police station of that area from a database. It takes an area or phone number as input
+and prints the corresponding other fields. (Note: create police_station table with appropriate fields).
+
+##servlet+jdbc+html(radio)
+
+<!DOCTYPE html>
+<html>
+<body>
+<form action = "Police" method = post >
+<fieldset>
+<input type = "radio" name = "n" value = 1 checked > Area <br>
+<input type = "radio" name = "n" value = 2 > Phone Number  <br>
+Enter area/phone number  : <input type = "text" name = "ap" > <br>
+</fieldset>
+<button type = "Submit"  > Submit </button>
+<button type  = "Reset"> Cancel </button>
+</form> 
+</body>
+</html>
+
+import java.io.*;
+import java.sql.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+import javax.servlet.annotation.WebServlet;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import com.mysql.jdbc.Statement;
+@WebServlet("/Police")
+public class Police extends HttpServlet {
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
+	{
+		response.setContentType("text/html");
+		PrintWriter out = response.getWriter();
+		try
+		{
+			Class.forName("com.mysql.jdbc.Driver");
+			Connection conn = (Connection)DriverManager.getConnection("jdbc:mysql://localhost:3306/mydb", "root", "") ;
+			Statement st = (Statement) conn.createStatement();
+			ResultSet rs = st.executeQuery("select area,phone from police ");
+			int n  = Integer.parseInt(request.getParameter("n"));
+			int c = 0 ;
+			switch (n) 
+			{	
+				case 1 :
+				while(rs.next())
+				{
+					String val = request.getParameter("ap");
+					if(rs.getString("area").equals(val))
+					{
+						out.println("Area " +val +" Phone " + rs.getString("phone"));
+						c =1;
+						break;  
+					}
+			    	}   
+				break;
+				case 2:
+				while(rs.next())
+				{
+					String val = request.getParameter("ap");				
+					if(rs.getString("phone").equals(val))
+					{
+						out.println("Area " +rs.getString("area") +" Phone " +val);
+						c = 1;
+						break;
+					}			
+				}
+				break;
+				default: out.println("Information does not exist");
+			}
+
+			if(c==0)
+				out.println("Information does not exist");
+		}
+		catch(Exception e)
+		{
+			out.print(e);
+		}
+	}
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
+	{   doGet(request, response);    }
+}
+
+
+5. Write a java servlet program with a method called initials () that takes input representing a full name and returns the initials of the name
+in all capital letters.
+Example: If Input is Robert B. Qwerty then Output should be RBQ.
+
+##servlet+html
+
+<!DOCTYPE html>
+<HTML>
+<BODY>
+<FORM ACTION="Initials" METHOD="GET">
+ENTER FULL NAME: <INPUT TYPE="TEXT" NAME="NAME"><BR>
+<INPUT TYPE="SUBMIT" VALUE="SUBMIT"><HR><HR>
+</FORM>
+</BODY>
+</HTML>
+
+
+import java.io.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+import javax.servlet.annotation.WebServlet;
+@WebServlet ("/Initials")
+public class Initials extends HttpServlet {
+	public static String initials(String name) {
+ 		if (name.length() == 0)
+          		return "No initials";  
+ 		String s=""+Character.toUpperCase(name.charAt(0));
+      		for (int i = 1; i < name.length() - 1; i++)
+        		if (name.charAt(i) == ' ')
+        			s=s+(Character.toUpperCase(name.charAt(i + 1)));
+      		return s;
+  	}
+  	public void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+ 		// Get print writer.
+    		PrintWriter out = res.getWriter();
+    		res.setContentType("text/html");
+    		String name=req.getParameter("NAME");
+    		String result=initials(name);
+    		out.println("<html><body>"+"<h1>Your initials are "+result+"</body></html>");
+  	}
+	// Servlet to handle “post” method
+  	public void doPost(HttpServletRequest req,  HttpServletResponse res) throws ServletException, IOException {
+ 		doGet(req,res);
+  	}
+}
+
+6. Write a servlet program to insert Employee details like Emp_ID, Employee_Name, Address, Date_of_Birth in Employee table using JDBC and display 
+the details in table format.
+
+##jdbc+servelt+html
+
+<!DPCTYPE HTML>
+<HTML>
+<BODY>
+<FORM ACTION="Employee" METHOD="GET">
+ENTER ID: <INPUT TYPE="TEXT" NAME="ID"><BR>
+ENTER NAME: <INPUT TYPE="TEXT" NAME="NAME"><BR>
+ENTER ADDRESS: <INPUT TYPE="TEXT" NAME="ADDRESS"><BR>
+ENTER DATE OF BIRTH: <INPUT TYPE="TEXT" NAME="DATEOFBIRTH"><BR>
+<INPUT TYPE="SUBMIT" VALUE="SUBMIT"><HR><HR>
+</FORM>
+</BODY>
+</HTML>
+
+import java.io.*; 
+import java.sql.*; 
+import javax.servlet.*; 
+import javax.servlet.http.*;
+import javax.servlet.annotation.WebServlet;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import com.mysql.jdbc.Statement;
+@WebServlet ("/Employee")
+public class EmpDetails extends HttpServlet { 
+  public void doGet(HttpServletRequest req,  HttpServletResponse res)  throws ServletException, IOException {  
+    PrintWriter out = res.getWriter(); 
+    res.setContentType("text/html"); 
+	String id=req.getParameter("ID");
+	String name=req.getParameter("NAME");
+	String address=req.getParameter("ADDRESS");
+	String date_of_birth=req.getParameter("DATEOFBIRTH");
+    System.out.println("Employee details:");
+    Connection conn = null;
+    String f1,f2,f3,f4;
+    try {
+    Class.forName("com.mysql.jdbc.Driver").newInstance();
+    conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/Employee","root","");
+	PreparedStatement pstmt=conn.prepareStatement("insert into Employee values(?,?,?,?)");
+		pstmt.setString(1,id);
+		pstmt.setString(2,name);
+		pstmt.setString(3,address);
+		pstmt.setInt(4,date_of_birth);
+		pstmt.execute();
+	out.println("Successfully inserted values into table");
+	 Statement stmt = conn.createStatement(); 
+    ResultSet rs = stmt.executeQuery("Select * From Employee");
+    while (rs.next()) {
+    f1 = rs.getString(1);
+    f2=rs.getString(2);
+    f3=rs.getString(3);
+    f4=rs.getString(4);
+    out.println("<table border=\"1\">\n"+"<tr><th>ID</th><th>NAME</th><th>ADDRESS</th><th>DATEOFBIRTH</th></tr>\n");
+    out.println(" <tr><td>"+f1+"</td><td>"+f2+"</td><td>"+f3+"</td><td>"+f4 +"</td></tr>");}
+    conn.close();
+    System.out.println("Disconnected from database");
+    } //end try
+    catch(ClassNotFoundException e) {
+    e.printStackTrace();    }
+    catch(SQLException e) { 
+    e.printStackTrace();}
+    catch (Exception e) {
+    e.printStackTrace();   }    }
+  public void doPost(HttpServletRequest req,  HttpServletResponse res)  throws ServletException, IOException {
+	  doGet(req,res);
+  }
+}
+
+
+7. Write a servlet program that uses JDBC to display the subjects allotted for the faculty. Subjects Table should have Sub_ID, Sub_Name, Faculty_ID 
+as the fields. Update subject details for a faculty using PreparedStatement and display how many rows are updated.
+
+##servlet+jdbc
+
+import java.io.*;
+import java.sql.*;
+import javax.servlet.*;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.*;
+@WebServlet("/faculty")
+public class faculty extends HttpServlet {
+	public void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+		PrintWriter out = res.getWriter();
+		res.setContentType("text/html");
+		try{
+			Class.forName("com.mysql.jdbc.Driver");
+			Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/faculty","root","");
+			Statement st = conn.createStatement();
+			ResultSet rs=st.executeQuery("select * from subject");
+			while(rs.next()){
+				int fid=rs.getInt("FacID");
+				String sub=rs.getString("Name");
+				out.println("<html><body>"+" FacID: "+fid+" SubName "+sub+"<br></body></html>");
+			}
+			PreparedStatement pst=conn.prepareStatement("update subject set Name= ? where FacID= ?");
+ 			pst.setString(1,"python");
+			pst.setInt(2,460);
+			int n = pst.executeUpdate();
+			out.println("Number of Rows Updated "+n );
+			PreparedStatement pst1=conn.prepareStatement("update subject set SubID= ? where FacID= ?");
+ 			pst1.setInt(1,436);
+			pst1.setInt(2,460);
+			pst1.execute();
+			out.println("<br>");
+		}
+		catch(Exception e){
+			out.println(e);
+		}
+	}
+	public void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		doGet(request, response);
+	}
+}
+
+8. Write a "SetCookies" servlet class to create six cookies. Three have the default expiration date, meaning that they should exist only until 
+the user next restarts the browser. The other three use setMaxAge to stipulate that they should exist for the next hour, regardless of whether the user
+restarts the browser or reboots the computer to initiate a new browsing session.
+
+import java.io.*;
+import javax.servlet.*;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.*;
+
+@WebServlet("/SetCookies")
+public class SetCookies extends HttpServlet {
+	protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+		Cookie ck1 = new Cookie("1", "a");
+		Cookie ck2 = new Cookie("2", "b");
+		Cookie ck3 = new Cookie("4", "d");
+		Cookie ck4 = new Cookie("8", "h");
+		Cookie ck5 = new Cookie("16", "p");
+		Cookie ck6 = new Cookie("32", "?");
+		
+		ck4.setMaxAge(3600);
+		ck5.setMaxAge(3600);
+		ck6.setMaxAge(3600); 
+		
+		Cookie[] cookies = {ck1, ck2, ck3, ck4, ck5, ck6};
+		for (Cookie cookie : cookies)
+			res.addCookie(cookie);
+		
+		PrintWriter out = res.getWriter();
+		out.println("<html><body>"
+					+ "<h2>Cookies have been set successfully as follows: </h2>"
+					+ "<table><tr><th>Key</th><th>Value</th><th>Expiry Time (in seconds)</th></tr>");
+		
+		for (Cookie cookie : cookies) {
+			out.println("<tr><td> " + cookie.getName() + " </td><td> " + cookie.getValue() + " </td><td> " + cookie.getMaxAge()
+					 + " </td></tr>");
+		}
+		out.println("</table></body></html>");
+	}
+}
+
+<!DOCTYPE html>
+<html>
+<body>
+<form action="SetCookies" method="GET">
+<input type="SUBMIT" value="Submit">
+</form>
+</body>
+</html>
+
+
+9. Develop a JSP application that has the following pages : The index page register.html contains 2 text boxes username, password  and a button "REGISTER".
+Once Register button clicked the page should be redirected to welcome.jsp. In welcome.jsp validate username and password and display welcome message 
+for a valid user. (Use Sessions)
+
+##jsp+html+sessions
+
+//register.html
+<form action = "welcome.jsp" method = post>
+Enter user name: <input type="text" name="user"><br>
+Enter password: <input type="text" name="pass"><br>
+<button type = "submit"> Register </button>
+</form>
+
+//welcome.jsp
+<%@ page import= "javax.servlet.RequestDispatcher" %>
+<%
+		String username = request.getParameter("user");
+		String password = request.getParameter("pass");
+		
+		HttpSession Session = request.getSession();
+		session.setAttribute("username", username);
+		session.setAttribute("password", password);
+		RequestDispatcher rd=request.getRequestDispatcher("sessiontrace.jsp");
+		rd.forward(request,response);	
+%>
+
+//sessiontrace.jsp
+<%
+			String username = (String) session.getAttribute("username");
+			String password = (String) session.getAttribute("password");
+			
+			if (username.equals("guest1") && password.equals("guest1rit")) 
+			{%>
+			Welcome <%= username %>
+			<%} 
+			else 
+			{%>
+				Username or Password is incorrect!
+			<%} 
+%>
+
+
+10.Write a JSP that takes the user’s name and age from a form. Echo back the name and age along
+with a message stating the price of movie tickets. The price is determined by the age passed to the JSP.
+- If the age is greater than 62, the movie ticket price is Rs. 50.
+- If the user is less than 10 years old, the price is Rs. 30.
+- For everyone else, the price is Rs. 80
+
+##jsp+html 
+
+
+<html>
+<body>
+<h1><center> Age based Price</center></h1>
+        <%
+        
+        String name= request.getParameter("NAME");
+        int age=Integer.parseInt(request.getParameter("AGE"));
+        int  price=0;
+        if (age > 62){
+        	price=50;
+        }
+        else if(age<10){
+        	price=30;
+        	
+        }
+        else{
+        	price=80;
+        }
+        
+        %>
+        Welcome <%=name %>
+	Your age <%=age %>
+        Price is <%=price %>
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html>
+<body>
+<FORM ACTION="Movie_ticket.jsp" METHOD="GET">
+ENTER NAME: <INPUT TYPE="TEXT" NAME="NAME"><BR>
+ENTER AGE: <INPUT TYPE="TEXT" NAME="AGE"><BR>
+<INPUT TYPE="SUBMIT" VALUE="SUBMIT"><HR><HR>
+</FORM>
+</body>
+</html>
+
+11. Write a JSP program to create a form with Book_No, Title, Author, Publication, Price and a Submit button. Using JSP-Database connectivity, 
+get the data from the form and insert the records into the database. Retrieve the book details for the particular title and display the details.
+
+##jsp+jdbc+html
+
+<form action = "book.jsp" method = post >
+
+Enter Book number : <input type ="text" name = "bno" > <br>
+Enter Title :  <input type ="text" name = "title" > <br>
+Enter Author: <input type ="text" name = "author" > <br>
+Enter Publication  <input type ="text" name = "pub" > <br>
+Enter Price  <input type ="text" name = "price" > <br>
+<button type = "Submit"> Submit </button>
+<button type = "Reset"> Cancel </button>
+
+</form> 
+
+
+////////book.jsp
+
+<body>
+<%@ page import="java.sql.*" %>
+<%@ page import = "javax.servlet.RequestDispatcher" %>
+<%
+int no = Integer.parseInt(request.getParameter("bno"));
+String title = request.getParameter("title");
+String author = request.getParameter("author");
+String publisher = request.getParameter("pub");
+int price = Integer.parseInt(request.getParameter("price"));
+
+try
+{
+Class.forName("com.mysql.jdbc.Driver");
+Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/bookdb","root","");
+PreparedStatement pstmt = conn.prepareStatement("insert into books values(?,?,?,?,?)");
+	pstmt.setInt(1,no);
+	pstmt.setString(2,title);
+	pstmt.setString(3,author);
+	pstmt.setString(4,publisher);
+	pstmt.setInt(5,price);
+	pstmt.execute();
+	//out.print("Success!");
+
+RequestDispatcher rd = request.getRequestDispatcher("form2.jsp");
+rd.forward(request,response);
+}
+catch(Exception e)
+{ 
+	out.print("Error");
+	out.print(e);
+}
+%>
+</body>
+
+
+/////////////form2.jsp
+
+<body>
+<form action = "displaybooks.jsp" method = post >
+Enter Title :  <input type ="text" name = "title" > <br>
+<button type = "Submit"> Submit </button>
+<button type = "Reset"> Cancel </button>
+</form> 
+</body>
+
+//////////displaybooks.jsp
+
+<body>
+<%@ page import = "java.sql.*" %>
+<%
+try
+{
+Class.forName("com.mysql.jdbc.Driver");
+Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/bookdb","root","");
+Statement stmt = conn.createStatement();	
+String title = request.getParameter("title");
+ResultSet rs = stmt.executeQuery("Select * from books where title = '"+title+"'");	
+      
+while(rs.next())
+{
+	out.print(" Book No. " +  rs.getInt("no") + " Title " + rs.getString("title") + " Author " + rs.getString("author") );
+	out.print(" Publisher " + rs.getString("publisher") + " Price " + rs.getInt("price"));
+}
+
+}
+
+catch(Exception e)
+{
+	out.print(e);
+}
+%>
+
+</body>
+
+
+12. Write a JSP program to accept the 5 subject marks entered and display his/her grade to the browser. Department has set the grade for the
+subject Java as follows: Above 90=S, 80-89=A, 70-79=B, 60-69=C, 50-59=D, Below 50=FAIL.
+
+#jsp+html
+
+<h1><center> GRADE</center></h1>
+        <%       
+        int marks1=Integer.parseInt(request.getParameter("MARKS1"));
+        int marks2=Integer.parseInt(request.getParameter("MARKS2"));
+        int marks3=Integer.parseInt(request.getParameter("MARKS3"));
+        int marks4=Integer.parseInt(request.getParameter("MARKS4"));
+        int marks5=Integer.parseInt(request.getParameter("MARKS5"));
+        float avg= (marks1+marks2+marks3+marks4+marks5)/5;
+        String grade;
+        if (avg > 90){
+                grade="S";
+        }
+        else if(avg > 80){
+                grade="A";        }
+        else if(avg > 70){
+                grade="B";        }
+        else if(avg > 60){
+                grade="C";        }
+        else if(avg > 50){
+                grade="D";        }
+        else {
+                grade="FAIL";        }       
+        %>       
+        Grade is <%=grade %>
+
+HTML
+
+<!DOCTYPE html>
+<html>
+<body>
+<FORM ACTION="12Marks.jsp" METHOD="GET">
+
+ENTER MARKS1: <INPUT TYPE="TEXT" NAME="MARKS1"><BR>
+ENTER MARKS2: <INPUT TYPE="TEXT" NAME="MARKS2"><BR>
+ENTER MARKS3: <INPUT TYPE="TEXT" NAME="MARKS3"><BR>
+ENTER MARKS4: <INPUT TYPE="TEXT" NAME="MARKS4"><BR>
+ENTER MARKS5: <INPUT TYPE="TEXT" NAME="MARKS5"><BR>
+
+<INPUT TYPE="SUBMIT" VALUE="SUBMIT"><HR><HR>
+</FORM>
+</body>
+</html>
